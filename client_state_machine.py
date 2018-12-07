@@ -8,6 +8,7 @@ import json
 from file_transfer import *
 import os
 import pickle
+import time
 
 class ClientSM:
     def __init__(self, s):
@@ -47,7 +48,8 @@ class ClientSM:
         return (False)
 
     def file_connect_to(self, peer):
-        msg = pickle.dumps({"action":"f_connect", "target":peer})
+
+        msg = pickle.dumps({'action': 'f_connect', "target":peer})
         mysend(self.s, msg)
         response = pickle.loads(myrecv(self.s))
         if response["status"] == "success":
@@ -283,11 +285,16 @@ class ClientSM:
             print('to transfer, put the file you wish to transfer in the folder \'to_transfer\' under the path which this program is')
             print('the files you downloaded will be in the folder \'downloads\'')
             # swi = input('Do you wish to start? (y)es/(n)o')
-            for filename in os.listdir(filepath):
-                print(os.path.join(filepath,filename))
-                file_send_init(os.path.join(filepath,filename), self.s)
+            lst = os.listdir(filepath)
+            for x in range(len(lst)):
+                print('({})'.format(x) + str(lst[x]))
+            mark = int(input('which one do you want to transfer?'))
+            file_send(os.path.join(filepath,lst[mark]), self.s)
+
+            time.sleep(5)
 
             print('all files tranferred')
+            self.state = S_LOGGEDIN
 
         elif self.state == S_FILETRANSFERING_DOWN:
             cur_path = os.path.dirname(os.path.abspath(__file__))
@@ -295,10 +302,12 @@ class ClientSM:
             if not os.path.exists(filepath):
                 os.makedirs('downloads')
             while True:
-                res = file_rec_init(filepath, self.s)
-                break
+                res = file_rec(filepath, self.s)
+                if res:
+                    break
+                # time.sleep(5)
             print('all files received')
-
+            # self.state = S_LOGGEDIN
 
 
 

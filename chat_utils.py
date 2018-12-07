@@ -27,7 +27,7 @@ S_VIDEO_CHATTING = 4
 S_FILETRANSFERING_UP = 5
 S_FILETRANSFERING_DOWN = 6
 
-SIZE_SPEC = 5
+SIZE_SPEC = 50
 
 CHAT_WAIT = 0.2
 
@@ -53,7 +53,7 @@ def mysend(s, msg):
     msg = ('0' * SIZE_SPEC + str(len(msg)))[-SIZE_SPEC:].encode() + msg
     # msg = msg.encode()
     total_sent = 0
-    while total_sent < len(msg) :
+    while total_sent < len(msg):
         sent = s.send(msg[total_sent:])
         if sent==0:
             print('server disconnected')
@@ -71,6 +71,7 @@ def myrecv(s):
         size += text
     size = int(size)
     #now receive message
+    print(size)
     msg = b''
     while len(msg) < size:
         text = s.recv(size-len(msg))
