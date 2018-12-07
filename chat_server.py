@@ -14,7 +14,6 @@ import json
 import pickle as pkl
 from chat_utils import *
 import chat_group as grp
-import file_server as fs
 # from Feed import Feed
 
 
@@ -46,9 +45,11 @@ class Server:
 
 
     def login(self, sock):
+        # print(sock)
         # read the msg that should have login code plus username
         try:
-            msg = json.loads(myrecv(sock))
+            msg = pkl.loads(myrecv(sock))
+            print(msg)
             if len(msg) > 0:
 
                 if msg["action"] == "login":
@@ -69,10 +70,10 @@ class Server:
 
                         print(name + ' logged in')
                         self.group.join(name)
-                        mysend(sock, json.dumps(
+                        mysend(sock, pkl.dumps(
                             {"action": "login", "status": "ok"}))
                     else:  # a client under this name has already logged in
-                        mysend(sock, json.dumps(
+                        mysend(sock, pkl.dumps(
                             {"action": "login", "status": "duplicate"}))
                         print(name + ' duplicate login attempt')
                 else:
@@ -106,25 +107,25 @@ class Server:
             # ==============================================================================
             # handle connect request this is implemented for you
             # ==============================================================================
-            msg = json.loads(msg)
+            msg = pkl.loads(msg)
             if msg["action"] == "connect":
                 to_name = msg["target"]
                 from_name = self.logged_sock2name[from_sock]
                 if to_name == from_name:
-                    msg = json.dumps({"action": "connect", "status": "self"})
+                    msg = pkl.dumps({"action": "connect", "status": "self"})
                 # connect to the peer
                 elif self.group.is_member(to_name):
                     to_sock = self.logged_name2sock[to_name]
                     self.group.connect(from_name, to_name)
                     the_guys = self.group.list_me(from_name)
-                    msg = json.dumps(
+                    msg = pkl.dumps(
                         {"action": "connect", "status": "success"})
                     for g in the_guys[1:]:
                         to_sock = self.logged_name2sock[g]
-                        mysend(to_sock, json.dumps(
+                        mysend(to_sock, pkl.dumps(
                             {"action": "connect", "status": "request", "from": from_name}))
                 else:
-                    msg = json.dumps(
+                    msg = pkl.dumps(
                         {"action": "connect", "status": "no-user"})
                 mysend(from_sock, msg)
 # ==============================================================================
@@ -153,7 +154,7 @@ class Server:
 
                     # IMPLEMENTATION
                     # ---- start your code ---- #
-                    mysend(to_sock, json.dumps(msg))
+                    mysend(to_sock, pkl.dumps(msg))
 
                     # ---- end of your code --- #
 
@@ -164,27 +165,27 @@ class Server:
 
 
 
-            # elif msg['action'] == 'f_connect':
-            #     to_name = msg["target"]
-            #     from_name = self.logged_sock2name[from_sock]
-            #     if to_name == from_name:
-            #         msg = json.dumps({"action": "f_connect", "status": "self"})
-            #     # connect to the peer
-            #     elif self.group.is_member(to_name):
-            #         to_sock = self.logged_name2sock[to_name]
-            #         self.group.connect(from_name, to_name)
-            #         the_guys = self.group.list_me(from_name)
-            #         msg = json.dumps(
-            #             {"action": "f_connect", "status": "success"})
-            #         for g in the_guys[1:]:
-            #             to_sock = self.logged_name2sock[g]
-            #             mysend(to_sock, json.dumps(
-            #                 {"action": "f_connect", "status": "request", "from": from_name}))
+            elif msg['action'] == 'f_connect':
+                to_name = msg["target"]
+                from_name = self.logged_sock2name[from_sock]
+                if to_name == from_name:
+                    msg = pkl.dumps({"action": "f_connect", "status": "self"})
+                # connect to the peer
+                elif self.group.is_member(to_name):
+                    to_sock = self.logged_name2sock[to_name]
+                    self.group.connect(from_name, to_name)
+                    the_guys = self.group.list_me(from_name)
+                    msg = pkl.dumps(
+                        {"action": "f_connect", "status": "success"})
+                    for g in the_guys[1:]:
+                        to_sock = self.logged_name2sock[g]
+                        mysend(to_sock, pkl.dumps(
+                            {"action": "f_connect", "status": "request", "from": from_name}))
 
-            #     else:
-            #         msg = json.dumps(
-            #             {"action": "f_connect", "status": "no-user"})
-            #     mysend(from_sock, msg)
+                else:
+                    msg = pkl.dumps(
+                        {"action": "f_connect", "status": "no-user"})
+                mysend(from_sock, msg)
 
                 
                 
@@ -205,12 +206,12 @@ class Server:
                 the_guys.remove(from_name)
                 # g = the_guys.pop()
                 # to_sock = self.logged_name2sock[g]
-                # mysend(to_sock, json.dumps(
+                # mysend(to_sock, pkl.dumps(
                 #         {"action": "disconnect", 'from': from_name, 'is_one': False}))
                 if len(the_guys) == 1:  # only one left
                     g = the_guys.pop()
                     to_sock = self.logged_name2sock[g]
-                    mysend(to_sock, json.dumps(
+                    mysend(to_sock, pkl.dumps(
                         {"action": "disconnect", "msg": "everyone left, you are alone", 'from': from_name, 'is_one': True}))
 # ==============================================================================
 #                 listing available peers: IMPLEMENT THIS
@@ -223,7 +224,7 @@ class Server:
                 msg = self.group.list_all(from_name)
 
                 # ---- end of your code --- #
-                mysend(from_sock, json.dumps(
+                mysend(from_sock, pkl.dumps(
                     {"action": "list", "results": msg}))
 # ==============================================================================
 #             retrieve a sonnet : IMPLEMENT THIS
@@ -237,14 +238,14 @@ class Server:
 
                 # ---- end of your code --- #
 
-                mysend(from_sock, json.dumps(
+                mysend(from_sock, pkl.dumps(
                     {"action": "poem", "results": poem}))
 # ==============================================================================
 #                 time
 # ==============================================================================
             elif msg["action"] == "time":
                 ctime = time.strftime('%d.%m.%y,%H:%M', time.localtime())
-                mysend(from_sock, json.dumps(
+                mysend(from_sock, pkl.dumps(
                     {"action": "time", "results": ctime}))
 # ==============================================================================
 #                 search: : IMPLEMENT THIS
@@ -268,7 +269,7 @@ class Server:
                 print('server side search: ' + search_rslt)
 
                 # ---- end of your code --- #
-                mysend(from_sock, json.dumps(
+                mysend(from_sock, pkl.dumps(
                     {"action": "search", "results": search_rslt}))
 
 # ==============================================================================

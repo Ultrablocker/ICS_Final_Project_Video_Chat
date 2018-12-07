@@ -7,6 +7,7 @@ from chat_utils import *
 import json
 from file_transfer import *
 import os
+import pickle
 
 class ClientSM:
     def __init__(self, s):
@@ -30,9 +31,9 @@ class ClientSM:
         return self.me
 
     def connect_to(self, peer):
-        msg = json.dumps({"action":"connect", "target":peer})
+        msg = pickle.dumps({"action":"connect", "target":peer})
         mysend(self.s, msg)
-        response = json.loads(myrecv(self.s))
+        response = pickle.loads(myrecv(self.s))
         if response["status"] == "success":
             self.peer = peer
             self.out_msg += 'You are connected with '+ self.peer + '\n'
@@ -46,9 +47,9 @@ class ClientSM:
         return (False)
 
     def file_connect_to(self, peer):
-        msg = json.dumps({"action":"f_connect", "target":peer})
+        msg = pickle.dumps({"action":"f_connect", "target":peer})
         mysend(self.s, msg)
-        response = json.loads(myrecv(self.s))
+        response = pickle.loads(myrecv(self.s))
         if response["status"] == "success":
             self.f_peer = peer
             self.out_msg += 'You are connected with '+ self.peer + "you may now transfer files!'\n" 
@@ -66,9 +67,9 @@ class ClientSM:
 
     def video_connect_to(self, peer):
         pass
-        msg = json.dumps({"action":"video_connect", "target":peer})
+        msg = pickle.dumps({"action":"video_connect", "target":peer})
         mysend(self.s, msg)
-        response = json.loads(myrecv(self.s))
+        response = pickle.loads(myrecv(self.s))
         if response["status"] == "success":
             self.peer = peer
             self.out_msg += 'You are connected with '+ self.peer + '\n'
@@ -130,7 +131,7 @@ class ClientSM:
 
 
     def disconnect(self):
-        msg = json.dumps({"action":"disconnect"})
+        msg = pickle.dumps({"action":"disconnect"})
         mysend(self.s, msg)
         self.out_msg += 'You are disconnected from ' + self.peer + '\n'
         self.peer = ''
@@ -159,13 +160,13 @@ class ClientSM:
                     self.state = S_OFFLINE
 
                 elif my_msg == 'time':
-                    mysend(self.s, json.dumps({"action":"time"}))
-                    time_in = json.loads(myrecv(self.s))["results"]
+                    mysend(self.s, pickle.dumps({"action":"time"}))
+                    time_in = pickle.loads(myrecv(self.s))["results"]
                     self.out_msg += "Time is: " + time_in
 
                 elif my_msg == 'who':
-                    mysend(self.s, json.dumps({"action":"list"}))
-                    logged_in = json.loads(myrecv(self.s))["results"]
+                    mysend(self.s, pickle.dumps({"action":"list"}))
+                    logged_in = pickle.loads(myrecv(self.s))["results"]
                     self.out_msg += 'Here are all the users in the system:\n'
                     self.out_msg += logged_in
 
@@ -214,8 +215,8 @@ class ClientSM:
 
                 elif my_msg[0] == '?':
                     term = my_msg[1:].strip()
-                    mysend(self.s, json.dumps({"action":"search", "target":term}))
-                    search_rslt = json.loads(myrecv(self.s))["results"].strip()
+                    mysend(self.s, pickle.dumps({"action":"search", "target":term}))
+                    search_rslt = pickle.loads(myrecv(self.s))["results"].strip()
                     if (len(search_rslt)) > 0:
                         self.out_msg += search_rslt + '\n\n'
                     else:
@@ -223,8 +224,8 @@ class ClientSM:
 
                 elif my_msg[0] == 'p' and my_msg[1:].isdigit():
                     poem_idx = my_msg[1:].strip()
-                    mysend(self.s, json.dumps({"action":"poem", "target":poem_idx}))
-                    poem = json.loads(myrecv(self.s))["results"]
+                    mysend(self.s, pickle.dumps({"action":"poem", "target":poem_idx}))
+                    poem = pickle.loads(myrecv(self.s))["results"]
                     if (len(poem) > 0):
                         self.out_msg = self.out_msg + poem + '\n\n'
                     else:
@@ -235,9 +236,9 @@ class ClientSM:
 
             if len(peer_msg) > 0:
                 try:
-                    peer_msg = json.loads(peer_msg)
+                    peer_msg = pickle.loads(peer_msg)
                 except Exception as err :
-                    self.out_msg += " json.loads failed " + str(err)
+                    self.out_msg += " pickle.loads failed " + str(err)
                     return self.out_msg
             
                 if peer_msg["action"] == "connect":
@@ -304,7 +305,7 @@ class ClientSM:
 
         elif self.state == S_CHATTING:
             if len(my_msg) > 0:     # my stuff going out
-                mysend(self.s, json.dumps({"action":"exchange", "from":"[" + self.me + "]", "message":my_msg}))
+                mysend(self.s, pickle.dumps({"action":"exchange", "from":"[" + self.me + "]", "message":my_msg}))
                 if my_msg == 'bye':
                     self.disconnect()
                     self.state = S_LOGGEDIN
@@ -313,7 +314,7 @@ class ClientSM:
   
 
                 # ----------your code here------#
-                peer_msg = json.loads(peer_msg)
+                peer_msg = pickle.loads(peer_msg)
                 if peer_msg['action'] == 'exchange':
                     self.out_msg += peer_msg['from'] + peer_msg['message']
                 if peer_msg['action'] == 'disconnect':

@@ -79,12 +79,10 @@ def main():
     with open('/Users/Robert1/Downloads/v_2009_holz_global_iew.pdf', 'rb') as f:
         l = f.read()
         print(l)
-    msg = ('abc', l)
+    msg = {'abc':l}
     msg = pickle.dumps(msg)
-    a = pickle.loads(msg)[1]
-    file = open('abc.pdf', 'wb')
-    pickle.dump(a, file)
-    file.close()
+    msg = pickle.loads(msg)
+    print(type(msg))
 
 
 

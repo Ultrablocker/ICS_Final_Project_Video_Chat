@@ -50,8 +50,8 @@ def print_state(state):
 
 def mysend(s, msg):
     #append size to message and send it
-    msg = ('0' * SIZE_SPEC + str(len(msg)))[-SIZE_SPEC:] + str(msg)
-    msg = msg.encode()
+    msg = ('0' * SIZE_SPEC + str(len(msg)))[-SIZE_SPEC:].encode() + msg
+    # msg = msg.encode()
     total_sent = 0
     while total_sent < len(msg) :
         sent = s.send(msg[total_sent:])
@@ -71,9 +71,9 @@ def myrecv(s):
         size += text
     size = int(size)
     #now receive message
-    msg = ''
+    msg = b''
     while len(msg) < size:
-        text = s.recv(size-len(msg)).decode()
+        text = s.recv(size-len(msg))
         if text == b'':
             print('disconnected')
             break
