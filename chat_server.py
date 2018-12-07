@@ -14,6 +14,7 @@ import json
 import pickle as pkl
 from chat_utils import *
 import chat_group as grp
+# from Feed import Feed
 
 
 class Server:
@@ -21,6 +22,7 @@ class Server:
         self.new_clients = []  # list of new sockets of which the user id is not known
         self.logged_name2sock = {}  # dictionary mapping username to socket
         self.logged_sock2name = {}  # dict mapping socket to user name
+        self.user_ip = {}
         self.all_sockets = []
         self.group = grp.Group()
         # start server
@@ -32,21 +34,27 @@ class Server:
         self.indices = {}
         # sonnet
         self.sonnet = indexer.PIndex("AllSonnets.txt")
+        # self.feed = Feed()
 
     def new_client(self, sock):
-        # add to all sockets and to new clients
+        #add to all sockets and to new clients
         print('new client...')
         sock.setblocking(0)
         self.new_clients.append(sock)
         self.all_sockets.append(sock)
 
+
+
     def login(self, sock):
+        # print(sock)
         # read the msg that should have login code plus username
         try:
-            msg = json.loads(myrecv(sock))
+            msg = pkl.loads(myrecv(sock))
+            print(msg)
             if len(msg) > 0:
 
                 if msg["action"] == "login":
+                    ip = msg["ip"]
                     name = msg["name"]
                     if self.group.is_member(name) != True:
                         # move socket from new clients list to logged clients
@@ -54,6 +62,8 @@ class Server:
                         # add into the name to sock mapping
                         self.logged_name2sock[name] = sock
                         self.logged_sock2name[sock] = name
+                        #add ip
+                        self.user_ip[name] = ip
                         # load chat history of that user
                         if name not in self.indices.keys():
                             try:
@@ -61,12 +71,13 @@ class Server:
                                     open(name + '.idx', 'rb'))
                             except IOError:  # chat index does not exist, then create one
                                 self.indices[name] = indexer.Index(name)
+
                         print(name + ' logged in')
                         self.group.join(name)
-                        mysend(sock, json.dumps(
+                        mysend(sock, pkl.dumps(
                             {"action": "login", "status": "ok"}))
                     else:  # a client under this name has already logged in
-                        mysend(sock, json.dumps(
+                        mysend(sock, pkl.dumps(
                             {"action": "login", "status": "duplicate"}))
                         print(name + ' duplicate login attempt')
                 else:
@@ -93,31 +104,100 @@ class Server:
     def handle_msg(self, from_sock):
         # read msg code
         msg = myrecv(from_sock)
+
+        print(msg)
+
         if len(msg) > 0:
             # ==============================================================================
             # handle connect request this is implemented for you
             # ==============================================================================
-            msg = json.loads(msg)
+            msg = pkl.loads(msg)
             if msg["action"] == "connect":
                 to_name = msg["target"]
                 from_name = self.logged_sock2name[from_sock]
                 if to_name == from_name:
-                    msg = json.dumps({"action": "connect", "status": "self"})
+                    msg = pkl.dumps({"action": "connect", "status": "self"})
                 # connect to the peer
                 elif self.group.is_member(to_name):
                     to_sock = self.logged_name2sock[to_name]
                     self.group.connect(from_name, to_name)
                     the_guys = self.group.list_me(from_name)
-                    msg = json.dumps(
+                    msg = pkl.dumps(
                         {"action": "connect", "status": "success"})
                     for g in the_guys[1:]:
                         to_sock = self.logged_name2sock[g]
-                        mysend(to_sock, json.dumps(
+                        mysend(to_sock, pkl.dumps(
                             {"action": "connect", "status": "request", "from": from_name}))
                 else:
-                    msg = json.dumps(
+                    msg = pkl.dumps(
                         {"action": "connect", "status": "no-user"})
                 mysend(from_sock, msg)
+
+# ==============================================================================
+# handle file transger request 
+# ==============================================================================
+
+
+            elif msg['action'] == 'f_connect':
+                to_name = msg["target"]
+                from_name = self.logged_sock2name[from_sock]
+                if to_name == from_name:
+                    msg = pkl.dumps({"action": "f_connect", "status": "self"})
+                # connect to the peer
+                elif self.group.is_member(to_name):
+                    to_sock = self.logged_name2sock[to_name]
+                    self.group.connect(from_name, to_name)
+                    the_guys = self.group.list_me(from_name)
+                    msg = pkl.dumps(
+                        {"action": "f_connect", "status": "success"})
+                    for g in the_guys[1:]:
+                        to_sock = self.logged_name2sock[g]
+                        mysend(to_sock, pkl.dumps(
+                            {"action": "f_connect", "status": "request", "from": from_name}))
+
+                else:
+                    msg = pkl.dumps(
+                        {"action": "f_connect", "status": "no-user"})
+                mysend(from_sock, msg)
+
+                
+                
+
+                pass
+
+# ==============================================================================
+# handle video call  request 
+# ==============================================================================
+
+
+            elif msg['action'] == 'video_connect':
+                to_name = msg["target"]
+                from_name = self.logged_sock2name[from_sock]
+                if to_name == from_name:
+                    msg = pkl.dumps({"action": "video_connect", "status": "self"})
+                # connect to the peer
+                elif self.group.is_member(to_name):
+                    from_ip = self.user_ip[from_name]
+                    to_ip = self.user_ip[to_name]
+                    to_sock = self.logged_name2sock[to_name]
+                    self.group.connect(from_name, to_name)
+                    the_guys = self.group.list_me(from_name)
+                    msg = pkl.dumps(
+                        {"action": "video_connect", "status": "success","target_ip":to_ip})
+                    for g in the_guys[1:]:
+                        to_sock = self.logged_name2sock[g]
+                        mysend(to_sock, pkl.dumps(
+                            {"action": "video_connect", "status": "request", "from": from_name,"target_ip":from_ip}))
+
+                else:
+                    msg = pkl.dumps(
+                        {"action": "f_connect", "status": "no-user"})
+                mysend(from_sock, msg)
+
+                
+                
+
+                pass
 # ==============================================================================
 # handle messeage exchange: IMPLEMENT THIS
 # ==============================================================================
@@ -128,8 +208,13 @@ class Server:
                 """
                 # IMPLEMENTATION
                 # ---- start your code ---- #
-                message = msg["message"]
-                self.indices[from_name].add_msg_and_index(text_proc(message,from_name))
+
+                message = msg['message']
+                self.indices[from_name].add_msg_and_index(message)
+                # self.indices[from_name].msgs.append(time.strftime('%d.%m.%y,%H:%M', time.localtime()))
+                # self.indices[from_name].msgs.append(from_name)
+                
+
 
                 # ---- end of your code --- #
 
@@ -139,11 +224,18 @@ class Server:
 
                     # IMPLEMENTATION
                     # ---- start your code ---- #
-                    
-                    
-                    mysend(to_sock, json.dumps(msg))
+                    mysend(to_sock, pkl.dumps(msg))
 
                     # ---- end of your code --- #
+
+
+
+
+
+
+
+
+
 
 # ==============================================================================
 # the "from" guy has had enough (talking to "to")!
@@ -153,11 +245,15 @@ class Server:
                 the_guys = self.group.list_me(from_name)
                 self.group.disconnect(from_name)
                 the_guys.remove(from_name)
+                # g = the_guys.pop()
+                # to_sock = self.logged_name2sock[g]
+                # mysend(to_sock, pkl.dumps(
+                #         {"action": "disconnect", 'from': from_name, 'is_one': False}))
                 if len(the_guys) == 1:  # only one left
                     g = the_guys.pop()
                     to_sock = self.logged_name2sock[g]
-                    mysend(to_sock, json.dumps(
-                        {"action": "disconnect", "msg": "everyone left, you are alone"}))
+                    mysend(to_sock, pkl.dumps(
+                        {"action": "disconnect", "msg": "everyone left, you are alone", 'from': from_name, 'is_one': True}))
 # ==============================================================================
 #                 listing available peers: IMPLEMENT THIS
 # ==============================================================================
@@ -165,11 +261,11 @@ class Server:
 
                 # IMPLEMENTATION
                 # ---- start your code ---- #
-                
-                msg = str(self.group.list_all(from_sock))
+                from_name = self.logged_sock2name[from_sock]
+                msg = self.group.list_all(from_name)
 
                 # ---- end of your code --- #
-                mysend(from_sock, json.dumps(
+                mysend(from_sock, pkl.dumps(
                     {"action": "list", "results": msg}))
 # ==============================================================================
 #             retrieve a sonnet : IMPLEMENT THIS
@@ -179,19 +275,18 @@ class Server:
                 # IMPLEMENTATION
                 # ---- start your code ---- #
                 
-                poem = '\n'.join(self.sonnet.get_poem(int(msg["target"])))
-                print('here:\n', poem)
+                poem = '\n'.join(self.sonnet.get_poem(int(msg['target'])))
 
                 # ---- end of your code --- #
 
-                mysend(from_sock, json.dumps(
+                mysend(from_sock, pkl.dumps(
                     {"action": "poem", "results": poem}))
 # ==============================================================================
 #                 time
 # ==============================================================================
             elif msg["action"] == "time":
                 ctime = time.strftime('%d.%m.%y,%H:%M', time.localtime())
-                mysend(from_sock, json.dumps(
+                mysend(from_sock, pkl.dumps(
                     {"action": "time", "results": ctime}))
 # ==============================================================================
 #                 search: : IMPLEMENT THIS
@@ -200,23 +295,22 @@ class Server:
 
                 # IMPLEMENTATION
                 # ---- start your code ---- #
-                term = msg["target"]
                 search_rslt = []
-                for i in self.indices.keys():
-                    result = self.indices[i].search(term)
-                    for x in result:
+                for user in self.indices.keys():
+                    m = self.indices[user].search_time(msg['target'])
+                    print(m)
+                    for x in m:
+                        for n in x:
+                            search_rslt.append(n)
+                        search_rslt.append('['+ user + ']' + '\n')
+                search_rslt = ' '.join(search_rslt).lstrip()
 
-                        search_rslt.append(x[1])
-                if search_rslt:
-                    search_rslt = '\n'.join(search_rslt)
-                else:
-                    search_rslt = ''
-                
+
                 
                 print('server side search: ' + search_rslt)
 
                 # ---- end of your code --- #
-                mysend(from_sock, json.dumps(
+                mysend(from_sock, pkl.dumps(
                     {"action": "search", "results": search_rslt}))
 
 # ==============================================================================
@@ -230,6 +324,8 @@ class Server:
 # ==============================================================================
 # main loop, loops *forever*
 # ==============================================================================
+
+
     def run(self):
         print('starting server...')
         while(1):

@@ -2,8 +2,9 @@ import time
 import socket
 import select
 import sys
-import json
+import pickle
 from chat_utils import *
+from file_transfer import *
 import client_state_machine as csm
 
 import threading
@@ -17,6 +18,7 @@ class Client:
         self.local_msg = ''
         self.peer_msg = ''
         self.args = args
+        self.ip = self.args.TEST
 
     def quit(self):
         self.socket.shutdown(socket.SHUT_RDWR)
@@ -47,7 +49,7 @@ class Client:
         read, write, error = select.select([self.socket], [], [], 0)
         my_msg = ''
         peer_msg = []
-        #peer_code = M_UNDEF    for json data, peer_code is redundant
+        peer_code = 'utf+8'    #for json data, peer_code is redundant
         if len(self.console_input) > 0:
             my_msg = self.console_input.pop(0)
         if self.socket in read:
@@ -63,9 +65,9 @@ class Client:
         my_msg, peer_msg = self.get_msgs()
         if len(my_msg) > 0:
             self.name = my_msg
-            msg = json.dumps({"action":"login", "name":self.name})
+            msg = pickle.dumps({"action":"login", "name":self.name, "ip":self.ip})
             self.send(msg)
-            response = json.loads(self.recv())
+            response = pickle.loads(self.recv())
             if response["status"] == 'ok':
                 self.state = S_LOGGEDIN
                 self.sm.set_state(S_LOGGEDIN)
