@@ -101,7 +101,6 @@ class Server:
         # read msg code
         try:
             msg = myrecv(from_sock)
-            print(len(msg))
         except UnicodeDecodeError:
             msg = from_sock.recv(1024)
 
@@ -109,11 +108,10 @@ class Server:
             # ==============================================================================
             # handle connect request this is implemented for you
             # ==============================================================================
-            if len(msg) > 4096:
-                file = open('dkw.txt', 'wb')
-                pickle.dump(msg, file)
+
 
             msg = pickle.loads(msg)
+            print(msg)
             if msg["action"] == "connect":
                 to_name = msg["target"]
                 from_name = self.logged_sock2name[from_sock]
@@ -164,21 +162,6 @@ class Server:
 
                     # ---- end of your code --- #
 
-            elif msg['action'] == 'f_exchange':
-                from_name = self.logged_sock2name[from_sock]
-                msg = pickle.dumps(msg)
-                """
-                Finding the list of people to send to and index message
-                """
-
-
-
-                the_guys = self.group.list_me(from_name)[1:]
-                for g in the_guys:
-                    to_sock = self.logged_name2sock[g]
-                    mysend(to_sock, msg)
-
-                pass
 
 
 
@@ -209,6 +192,35 @@ class Server:
                     msg = pickle.dumps(
                         {"action": "f_connect", "status": "no-user"})
                 mysend(from_sock, msg)
+
+
+
+            elif msg['action'] == 'f_confirm':
+                from_name = self.logged_sock2name[from_sock]
+                print('f_confirm received')
+
+                the_guys = self.group.list_me(from_name)[1:]
+                for g in the_guys:
+                    to_sock = self.logged_name2sock[g]
+                    mysend(to_sock, pickle.dumps(msg))
+
+            elif msg['action'] == 'f_confirm_2':
+                from_name = self.logged_sock2name[from_sock]
+                print('f_confirm_2 received')
+
+                the_guys = self.group.list_me(from_name)[1:]
+                for g in the_guys:
+                    to_sock = self.logged_name2sock[g]
+                    mysend(to_sock, pickle.dumps(msg))
+            elif msg['action'] == 'f_confirm_3':
+                from_name = self.logged_sock2name[from_sock]
+                print('f_confirm_3 received')
+
+                the_guys = self.group.list_me(from_name)[1:]
+                for g in the_guys:
+                    to_sock = self.logged_name2sock[g]
+                    mysend(to_sock, pickle.dumps(msg))
+
 
                 
                 
@@ -295,6 +307,7 @@ class Server:
                 mysend(from_sock, pickle.dumps(
                     {"action": "search", "results": search_rslt}))
 
+
 # ==============================================================================
 #                 the "from" guy really, really has had enough
 # ==============================================================================
@@ -312,10 +325,13 @@ class Server:
         print('starting server...')
         while(1):
             read, write, error = select.select(self.all_sockets, [], [])
+
             print('checking logged clients..')
             for logc in list(self.logged_name2sock.values()):
                 if logc in read:
                     self.handle_msg(logc)
+                    # time.sleep(2)
+            # print('selected')
             print('checking new clients..')
             for newc in self.new_clients[:]:
                 if newc in read:

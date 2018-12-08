@@ -6,7 +6,7 @@ import time
 # CHAT_IP = socket.gethostbyname(socket.gethostname())
 CHAT_IP = ''#socket.gethostbyname(socket.gethostname())
 
-CHAT_PORT = 1112
+CHAT_PORT = 11120
 SERVER = (CHAT_IP, CHAT_PORT)
 
 menu = "\n++++ Choose one of the following commands\n \
@@ -27,7 +27,7 @@ S_VIDEO_CHATTING = 4
 S_FILETRANSFERING_UP = 5
 S_FILETRANSFERING_DOWN = 6
 
-SIZE_SPEC = 50
+SIZE_SPEC = 5
 
 CHAT_WAIT = 0.2
 
@@ -59,6 +59,7 @@ def mysend(s, msg):
             print('server disconnected')
             break
         total_sent += sent
+    print(len(msg))
 
 def myrecv(s):
     #receive size first
@@ -75,11 +76,13 @@ def myrecv(s):
     msg = b''
     while len(msg) < size:
         text = s.recv(size-len(msg))
+        msg += text
         if text == b'':
             print('disconnected')
             break
-        msg += text
+        
     #print ('received '+message)
+    # print(len(msg))
     return (msg)
 
 def text_proc(text, user):
