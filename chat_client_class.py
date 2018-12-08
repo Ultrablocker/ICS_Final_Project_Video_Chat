@@ -31,7 +31,7 @@ class Client:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM )
         svr = SERVER if self.args.d == None else (self.args.d, CHAT_PORT)
         self.socket.connect(svr)
-        self.sm = csm.ClientSM(self.socket)
+        self.sm = csm.ClientSM(self.socket,self.ip)
         reading_thread = threading.Thread(target=self.read_input)
         reading_thread.daemon = True
         reading_thread.start()

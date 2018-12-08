@@ -181,13 +181,13 @@ class Server:
                     to_ip = self.user_ip[to_name]
                     to_sock = self.logged_name2sock[to_name]
                     self.group.connect(from_name, to_name)
-                    the_guys = self.group.list_me(from_name)
+                    #the_guys = self.group.list_me(from_name)
                     msg = pkl.dumps(
                         {"action": "video_connect", "status": "success","target_ip":to_ip})
-                    for g in the_guys[1:]:
-                        to_sock = self.logged_name2sock[g]
-                        mysend(to_sock, pkl.dumps(
-                            {"action": "video_connect", "status": "request", "from": from_name,"target_ip":from_ip}))
+                    # for g in the_guys[1:]:
+                    #     to_sock = self.logged_name2sock[g]
+                    mysend(to_sock, pkl.dumps(
+                        {"action": "video_connect", "status": "request", "from": from_name,"target_ip":from_ip}))
 
                 else:
                     msg = pkl.dumps(

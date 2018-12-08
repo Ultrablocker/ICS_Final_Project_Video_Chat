@@ -11,7 +11,8 @@ import pickle
 import sys
 import time
 import argparse
-IP = ''
+from audio_server import *
+
 class ClientSM:
     def __init__(self, s,ip):
         self.state = S_OFFLINE
@@ -21,6 +22,7 @@ class ClientSM:
         self.s = s
         self.f_peer = ''
         self.ip = ip
+        self.target_ip = ''
 
     def set_state(self, state):
         self.state = state
@@ -146,8 +148,9 @@ class ClientSM:
                     pass
                     peer = my_msg[1:]
                     peer = peer.strip()
-                    result,IP = self.video_connect_to(peer)
+                    result,ip = self.video_connect_to(peer)
                     if result:
+                        self.target_ip = ip
                         self.state = S_VIDEO_CHATTING
                         self.out_msg += 'Connect to ' + peer + '. Chat away!\n\n'
                         self.out_msg += '-----------------------------------\n'
@@ -214,7 +217,7 @@ class ClientSM:
 
                     # ----------your code here------#
                     self.out_msg += peer_msg['from'] + ' starts a video call'
-                    IP = peer_msg["target_ip"]
+                    self.target_ip = peer_msg["target_ip"]
                     self.state = S_VIDEO_CHATTING
 
                     
@@ -228,25 +231,25 @@ class ClientSM:
 # This is event handling instate "S_CHATTING"
 #==============================================================================
         elif self.state == S_VIDEO_CHATTING:
-            vclient = Video_Client(IP, PORT, SHOWME, LEVEL)
-            vserver = Video_Server(PORT)
-            aclient = Audio_Client(IP, PORT+1)
+            # vclient = Video_Client(IP, PORT, SHOWME, LEVEL)
+            # vserver = Video_Server(PORT)
+            aclient = Audio_Client(self.target_ip, PORT+1)
             aserver = Audio_Server(PORT+1)
     
-            vserver.start()
+            # vserver.start()
             aserver.start()
             time.sleep(3)
             aclient.start()
-            vclient.start()
+            # vclient.start()
 
             while True:
-            time.sleep(1)
-            # if not vserver.isAlive() or not vclient.isAlive():
-            #     print("Video connection lost...")
-            #     sys.exit(0)
-            if not aserver.isAlive() or not aclient.isAlive():
-                print("Audio connection lost...")
-                sys.exit(0)
+                time.sleep(1)
+                # if not vserver.isAlive() or not vclient.isAlive():
+                #     print("Video connection lost...")
+                #     sys.exit(0)
+                if not aserver.isAlive() or not aclient.isAlive():
+                    print("Audio connection lost...")
+                    sys.exit(0)
 
 
 
