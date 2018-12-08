@@ -23,6 +23,7 @@ class ClientSM:
         self.f_peer = ''
         self.ip = ip
         self.target_ip = ''
+        
 
     def set_state(self, state):
         self.state = state
@@ -88,6 +89,11 @@ class ClientSM:
         return (False,0)
 
 
+    def v_disconnect(self):
+        msg = pickle.dumps({"action":"v_disconnect"})
+        mysend(self.s, msg)
+        self.out_msg += 'You are disconnected from ' + self.peer + '\n'
+        self.peer = ''
 
 
     def disconnect(self):
@@ -220,6 +226,7 @@ class ClientSM:
                     self.target_ip = peer_msg["target_ip"]
                     self.state = S_VIDEO_CHATTING
 
+
                     
 
 
@@ -233,24 +240,61 @@ class ClientSM:
         elif self.state == S_VIDEO_CHATTING:
             # vclient = Video_Client(IP, PORT, SHOWME, LEVEL)
             # vserver = Video_Server(PORT)
-            aclient = Audio_Client(self.target_ip, PORT+1)
-            aserver = Audio_Server(PORT+1)
+
+            self.aclient = Audio_Client(self.target_ip, PORT+1)
+            self.aserver = Audio_Server(PORT+1)
+            
+
+            
     
             # vserver.start()
-            aserver.start()
-            time.sleep(3)
-            aclient.start()
+            
+            self.aserver.start()
+            
+            # self.aserver.set_start()
+            self.aclient.start()
             # vclient.start()
+            self.state = S_WATING_CALL_ENDING
 
-            while True:
-                time.sleep(1)
-                # if not vserver.isAlive() or not vclient.isAlive():
-                #     print("Video connection lost...")
+
+            # while True:
+                # time.sleep(1)
+                # # if not vserver.isAlive() or not vclient.isAlive():
+                # #     print("Video connection lost...")
+                # #     sys.exit(0)
+                # if not aserver.isAlive() or not aclient.isAlive():
+                #     print("Audio connection lost...")
                 #     sys.exit(0)
-                if not aserver.isAlive() or not aclient.isAlive():
-                    print("Audio connection lost...")
-                    sys.exit(0)
 
+
+        elif self.state == S_WATING_CALL_ENDING:
+            if len(my_msg) > 0:     # my stuff going out
+                
+                if my_msg == 'end':
+                    
+                    self.v_disconnect()
+                    
+                    self.aclient.stop()
+                    print("audio client disconnect")
+                    time.sleep(1)
+                    self.aserver.stop()
+                    # self.aserver.set_start()
+                    # print("audio server disconnect")
+
+                    self.state = S_LOGGEDIN
+                    self.peer = ''
+            if len(peer_msg) > 0:
+                peer_msg = pickle.loads(peer_msg)
+                if peer_msg["action"] == "v_disconnect":
+                    self.aclient.stop()
+                    time.sleep(1)
+                    # self.aserver.stop()
+
+                    self.state = S_LOGGEDIN
+                    self.peer = ''
+
+            if self.state == S_LOGGEDIN:
+                self.out_msg += menu
 
 
 

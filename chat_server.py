@@ -23,6 +23,7 @@ class Server:
         self.logged_name2sock = {}  # dictionary mapping username to socket
         self.logged_sock2name = {}  # dict mapping socket to user name
         self.user_ip = {}
+        self.client_call_avail={}
         self.all_sockets = []
         self.group = grp.Group()
         # start server
@@ -64,6 +65,8 @@ class Server:
                         self.logged_sock2name[sock] = name
                         #add ip
                         self.user_ip[name] = ip
+                        #set call available state
+                        self.client_call_avail[name] = 'available'
                         # load chat history of that user
                         if name not in self.indices.keys():
                             try:
@@ -94,6 +97,8 @@ class Server:
         del self.indices[name]
         del self.logged_name2sock[name]
         del self.logged_sock2name[sock]
+        del self.user_ip[name]
+        del self.client_call_avail[name]
         self.all_sockets.remove(sock)
         self.group.leave(name)
         sock.close()
@@ -115,6 +120,7 @@ class Server:
             if msg["action"] == "connect":
                 to_name = msg["target"]
                 from_name = self.logged_sock2name[from_sock]
+                self.client_call_avail[from_name] = "busy"
                 if to_name == from_name:
                     msg = pkl.dumps({"action": "connect", "status": "self"})
                 # connect to the peer
@@ -126,6 +132,7 @@ class Server:
                         {"action": "connect", "status": "success"})
                     for g in the_guys[1:]:
                         to_sock = self.logged_name2sock[g]
+                        self.client_call_avail[g] = "busy"
                         mysend(to_sock, pkl.dumps(
                             {"action": "connect", "status": "request", "from": from_name}))
                 else:
@@ -175,8 +182,12 @@ class Server:
                 from_name = self.logged_sock2name[from_sock]
                 if to_name == from_name:
                     msg = pkl.dumps({"action": "video_connect", "status": "self"})
+                elif self.client_call_avail[to_name] == "busy":
+                    msg = pkl.dumps({"action": "video_connect", "status": "busy"})
                 # connect to the peer
                 elif self.group.is_member(to_name):
+                    self.client_call_avail[from_name] = "busy"
+                    self.client_call_avail[to_name] = "busy"
                     from_ip = self.user_ip[from_name]
                     to_ip = self.user_ip[to_name]
                     to_sock = self.logged_name2sock[to_name]
@@ -254,6 +265,25 @@ class Server:
                     to_sock = self.logged_name2sock[g]
                     mysend(to_sock, pkl.dumps(
                         {"action": "disconnect", "msg": "everyone left, you are alone", 'from': from_name, 'is_one': True}))
+
+# ==============================================================================
+# video disconnect
+# ==============================================================================
+
+            elif msg["action"] == "v_disconnect":
+                print("received")
+                from_name = self.logged_sock2name[from_sock]
+                the_guys = self.group.list_me(from_name)
+                self.group.disconnect(from_name)
+                self.client_call_avail[from_name] = "available"
+
+                the_guys.remove(from_name)
+                g = the_guys.pop()
+                self.client_call_avail[g] = "available"
+                to_sock = self.logged_name2sock[g]
+                mysend(to_sock,pkl.dumps({"action":"v_disconnect"}))
+                print("sent")
+
 # ==============================================================================
 #                 listing available peers: IMPLEMENT THIS
 # ==============================================================================
