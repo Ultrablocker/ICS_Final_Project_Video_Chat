@@ -12,42 +12,42 @@ def file_send(filename, s):
     pos = filename_rev.find('/')
     filename = filename[-pos:]
     print(filename)
-    
-    l = f.read()
-    m = {'action': 'f_exchange', 'data': l, 'size': size, 'filename': filename}
-    print(m['size'])
-    m = pickle.dumps(m)
-    mysend(s, m)
+    l = f.read(1024)
+    com_size = 0
+    while (l):
+       s.send(l)
+       # print('Sent ',repr(l))
+       com_size += 1024
+       percent= com_size/size
+       if percent < 1 and com_size % 102400 == 0:
+           print("\033[A                             \033[A")
+           print("Transferring...{percent:.2%}\r".format(percent = com_size/size))
+       l = f.read(1024)
+    print("\033[A                             \033[A")
+    print('Transferring...100%')
     f.close()
 
-    
-def file_rec_init(path, s):
-    text = myrecv(s)
-    print(type(text))
 
-    file_rec(path, s)
-
-def file_rec(path, s):
-    # size = text['size']
-    # cur_size = 0
-    # print(myrecv(s))
-    msg = pickle.loads(myrecv(s))
-    filename = msg['filename']
-    print(filename)
-    data = msg['data']
-    print(type(data))
-    filename = os.path.join(path, filename)
+def file_rec(path, s, size, name):
+    filename = os.path.join(path, name)
+    # print(filename)
+    com_size = 0
     with open(filename, 'wb') as f:
-        print('file opened')
         print('receiving data...')
-        # print(data)
-        f.write(data)
+        while True:
+            data = s.recv(1024)
+            # print(data)
+            com_size += 1024
+            percent= com_size/size
+            if percent < 1 and com_size % 102400 == 0:
+                print ("\033[A                             \033[A")
+                print("Downloading...{percent:.2%}".format(percent = com_size/size))            
+            if not data:
+                break
+            f.write(data)
+    print("\033[A                             \033[A")
+    print('Downloading...100%')
             
-            # write data to a file
-            
-    # msg = 'transfer complete'
-    # msg = msg.encode()
-    # s.send(msg)
     print('file received')
 
 
@@ -56,16 +56,16 @@ def file_rec(path, s):
 def main():
     
     
-    with open('/Users/Robert1/Downloads/v_2009_holz_global_iew.pdf', 'rb') as f:
-        l = f.read(1024)
-        print(l)
-    msg = pickle.dumps({'action': 'f_exchange', 'data': l, 'size': size, 'filename': 'filename'})
-    print(len(msg))
-    msg = {'abc':l}
-    msg = pickle.dumps(msg)
-    msg = pickle.loads(msg)
-    print(type(msg))
-
+    # with open('/Users/Robert1/Downloads/v_2009_holz_global_iew.pdf', 'rb') as f:
+    #     l = f.read(1024)
+    #     print(l)
+    # msg = pickle.dumps({'action': 'f_exchange', 'data': l, 'size': size, 'filename': 'filename'})
+    # print(len(msg))
+    # msg = {'abc':l}
+    # msg = pickle.dumps(msg)
+    # msg = pickle.loads(msg)
+    # print(type(msg))
+    print(type(socket.gethostbyname(socket.gethostname())))
 
 
 if __name__ == '__main__':

@@ -22,6 +22,8 @@ class Server:
         self.new_clients = []  # list of new sockets of which the user id is not known
         self.logged_name2sock = {}  # dictionary mapping username to socket
         self.logged_sock2name = {}  # dict mapping socket to user name
+        self.user_ip = {}
+        self.client_call_avail={}
         self.all_sockets = []
         self.group = grp.Group()
         # start server
@@ -53,6 +55,7 @@ class Server:
             if len(msg) > 0:
 
                 if msg["action"] == "login":
+                    ip = msg["ip"]
                     name = msg["name"]
                     if self.group.is_member(name) != True:
                         # move socket from new clients list to logged clients
@@ -60,6 +63,10 @@ class Server:
                         # add into the name to sock mapping
                         self.logged_name2sock[name] = sock
                         self.logged_sock2name[sock] = name
+                        #add ip
+                        self.user_ip[name] = ip
+                        #set call available state
+                        self.client_call_avail[name] = 'available'
                         # load chat history of that user
                         if name not in self.indices.keys():
                             try:
@@ -90,6 +97,8 @@ class Server:
         del self.indices[name]
         del self.logged_name2sock[name]
         del self.logged_sock2name[sock]
+        del self.user_ip[name]
+        del self.client_call_avail[name]
         self.all_sockets.remove(sock)
         self.group.leave(name)
         sock.close()
@@ -101,7 +110,6 @@ class Server:
         # read msg code
         try:
             msg = myrecv(from_sock)
-            print(len(msg))
         except UnicodeDecodeError:
             msg = from_sock.recv(1024)
 
@@ -109,11 +117,10 @@ class Server:
             # ==============================================================================
             # handle connect request this is implemented for you
             # ==============================================================================
-            if len(msg) > 4096:
-                file = open('dkw.txt', 'wb')
-                pickle.dump(msg, file)
+
 
             msg = pickle.loads(msg)
+            # print(msg)
             if msg["action"] == "connect":
                 to_name = msg["target"]
                 from_name = self.logged_sock2name[from_sock]
@@ -134,6 +141,45 @@ class Server:
                     msg = pickle.dumps(
                         {"action": "connect", "status": "no-user"})
                 mysend(from_sock, msg)
+# ==============================================================================
+# video connect
+# ==============================================================================
+
+            elif msg['action'] == 'video_connect':
+                to_name = msg["target"]
+                from_name = self.logged_sock2name[from_sock]
+                if to_name == from_name:
+                    msg = pickle.dumps({"action": "video_connect", "status": "self"})
+                elif to_name not in self.client_call_avail:
+                    msg = pickle.dumps(
+                        {"action": "video_connect", "status": "no-user"})
+                elif self.client_call_avail[to_name] == "busy":
+                    msg = pickle.dumps({"action": "video_connect", "status": "busy"})
+                # connect to the peer
+                elif self.group.is_member(to_name):
+                    self.client_call_avail[from_name] = "busy"
+                    self.client_call_avail[to_name] = "busy"
+                    from_ip = self.user_ip[from_name]
+                    to_ip = self.user_ip[to_name]
+                    to_sock = self.logged_name2sock[to_name]
+                    self.group.connect(from_name, to_name)
+                    #the_guys = self.group.list_me(from_name)
+                    msg = pickle.dumps(
+                        {"action": "video_connect", "status": "success","target_ip":to_ip})
+                    # for g in the_guys[1:]:
+                    #     to_sock = self.logged_name2sock[g]
+                    mysend(to_sock, pickle.dumps(
+                        {"action": "video_connect", "status": "request", "from": from_name,"target_ip":from_ip}))
+
+                else:
+                    msg = pickle.dumps(
+                        {"action": "video_connect", "status": "no-user"})
+                mysend(from_sock, msg)
+
+                
+                
+
+                pass
 # ==============================================================================
 # handle messeage exchange: IMPLEMENT THIS
 # ==============================================================================
@@ -164,21 +210,6 @@ class Server:
 
                     # ---- end of your code --- #
 
-            elif msg['action'] == 'f_exchange':
-                from_name = self.logged_sock2name[from_sock]
-                msg = pickle.dumps(msg)
-                """
-                Finding the list of people to send to and index message
-                """
-
-
-
-                the_guys = self.group.list_me(from_name)[1:]
-                for g in the_guys:
-                    to_sock = self.logged_name2sock[g]
-                    mysend(to_sock, msg)
-
-                pass
 
 
 
@@ -210,6 +241,35 @@ class Server:
                         {"action": "f_connect", "status": "no-user"})
                 mysend(from_sock, msg)
 
+
+
+            elif msg['action'] == 'f_confirm':
+                from_name = self.logged_sock2name[from_sock]
+                print('f_confirm received')
+
+                the_guys = self.group.list_me(from_name)[1:]
+                for g in the_guys:
+                    to_sock = self.logged_name2sock[g]
+                    mysend(to_sock, pickle.dumps(msg))
+
+            elif msg['action'] == 'f_confirm_2':
+                from_name = self.logged_sock2name[from_sock]
+                print('f_confirm_2 received')
+
+                the_guys = self.group.list_me(from_name)[1:]
+                for g in the_guys:
+                    to_sock = self.logged_name2sock[g]
+                    mysend(to_sock, pickle.dumps(msg))
+            elif msg['action'] == 'f_confirm_3':
+                from_name = self.logged_sock2name[from_sock]
+                print('f_confirm_3 received')
+
+                the_guys = self.group.list_me(from_name)[1:]
+                for g in the_guys:
+                    to_sock = self.logged_name2sock[g]
+                    mysend(to_sock, pickle.dumps(msg))
+
+
                 
                 
 
@@ -236,6 +296,34 @@ class Server:
                     to_sock = self.logged_name2sock[g]
                     mysend(to_sock, pickle.dumps(
                         {"action": "disconnect", "msg": "everyone left, you are alone", 'from': from_name, 'is_one': True}))
+
+# ==============================================================================
+# video disconnect
+# ==============================================================================
+            elif msg["action"] == "f_disconnect":
+                print("received")
+                from_name = self.logged_sock2name[from_sock]
+                the_guys = self.group.list_me(from_name)
+                self.group.disconnect(from_name)
+                self.client_call_avail[from_name] = "available"
+
+                the_guys.remove(from_name)
+                g = the_guys.pop()
+                
+
+            elif msg["action"] == "v_disconnect":
+                print("received")
+                from_name = self.logged_sock2name[from_sock]
+                the_guys = self.group.list_me(from_name)
+                self.group.disconnect(from_name)
+                self.client_call_avail[from_name] = "available"
+
+                the_guys.remove(from_name)
+                g = the_guys.pop()
+                self.client_call_avail[g] = "available"
+                to_sock = self.logged_name2sock[g]
+                mysend(to_sock,pickle.dumps({"action":"v_disconnect"}))
+                print("sent")
 # ==============================================================================
 #                 listing available peers: IMPLEMENT THIS
 # ==============================================================================
@@ -295,6 +383,7 @@ class Server:
                 mysend(from_sock, pickle.dumps(
                     {"action": "search", "results": search_rslt}))
 
+
 # ==============================================================================
 #                 the "from" guy really, really has had enough
 # ==============================================================================
@@ -312,10 +401,13 @@ class Server:
         print('starting server...')
         while(1):
             read, write, error = select.select(self.all_sockets, [], [])
+
             print('checking logged clients..')
             for logc in list(self.logged_name2sock.values()):
                 if logc in read:
                     self.handle_msg(logc)
+                    # time.sleep(2)
+            # print('selected')
             print('checking new clients..')
             for newc in self.new_clients[:]:
                 if newc in read:

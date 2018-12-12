@@ -8,16 +8,22 @@ import json
 from file_transfer import *
 import os
 import pickle
+import sys
 import time
+from file_server import FileServer
+import socket
+import argparse
+from audio_server import *
 
 class ClientSM:
-    def __init__(self, s):
+    def __init__(self, s, ip):
         self.state = S_OFFLINE
         self.peer = ''
         self.me = ''
         self.out_msg = ''
         self.s = s
-        self.f_peer = ''
+        self.ip = ip
+        self.target_ip = ''
 
     def set_state(self, state):
         self.state = state
@@ -53,8 +59,8 @@ class ClientSM:
         mysend(self.s, msg)
         response = pickle.loads(myrecv(self.s))
         if response["status"] == "success":
-            self.f_peer = peer
-            self.out_msg += 'You are connected with '+ self.peer + "you may now transfer files!'\n" 
+            self.peer = peer
+            self.out_msg += 'You are connected with  '+ self.peer + "you may now transfer files!'\n" 
             return (True)
         elif response["status"] == "busy":
             self.out_msg += 'User is busy. Please try again later\n'
@@ -68,68 +74,32 @@ class ClientSM:
 
 
     def video_connect_to(self, peer):
-        pass
         msg = pickle.dumps({"action":"video_connect", "target":peer})
         mysend(self.s, msg)
         response = pickle.loads(myrecv(self.s))
         if response["status"] == "success":
             self.peer = peer
             self.out_msg += 'You are connected with '+ self.peer + '\n'
-            return (True)
+            return (True,response["target_ip"])
         elif response["status"] == "busy":
             self.out_msg += 'User is busy. Please try again later\n'
         elif response["status"] == "self":
             self.out_msg += 'Cannot talk to yourself (sick)\n'
         else:
             self.out_msg += 'User is not online, try again later\n'
-        return (False)
+        return (False,0)
 
-    def vsend(self, framestring, from_sock, to_sock):
-        pass
-        totalsent = 0
-        metasent = 0
-        length =len(framestring)
-        lengthstr=str(length).zfill(8)
+    def v_disconnect(self):
+        msg = pickle.dumps({"action":"v_disconnect"})
+        mysend(self.s, msg)
+        self.out_msg += 'You are disconnected from ' + self.peer + '\n'
+        self.peer = ''
 
-        while metasent < 8 :
-            sent = self.to_sock.send(lengthstr[metasent:])
-            if sent == 0:
-                raise RuntimeError("Socket connection broken")
-            metasent += sent
-        
-        
-        while totalsent < length :
-            sent = self.to_sock.send(framestring[totalsent:])
-            if sent == 0:
-                raise RuntimeError("Socket connection broken")
-            totalsent += sent
-
-    def vreceive(self, from_sock, to_sock):
-        pass
-        totrec=0
-        metarec=0
-        msgArray = []
-        metaArray = []
-        while metarec < 8:
-            chunk = self.to_sock.recv(8 - metarec)
-            if chunk == '':
-                raise RuntimeError("Socket connection broken")
-            metaArray.append(chunk)
-            metarec += len(chunk)
-        lengthstr= ''.join(metaArray)
-        length=int(lengthstr)
-
-        while totrec<length :
-            chunk = self.sock.recv(length - totrec)
-            if chunk == '':
-                raise RuntimeError("Socket connection broken")
-            msgArray.append(chunk)
-            totrec += len(chunk)
-        return ''.join(msgArray)
-
-
-
-
+    def f_disconnect(self):
+        msg = pickle.dumps({"action":"f_disconnect"})
+        mysend(self.s, msg)
+        self.out_msg += '\n'
+        self.peer = ''
 
 
     def disconnect(self):
@@ -139,6 +109,7 @@ class ClientSM:
         self.peer = ''
 
     def proc(self, my_msg, peer_msg):
+
         self.out_msg = ''
 #==============================================================================
 # Once logged in, do a few things: get peer listing, connect, search
@@ -190,12 +161,15 @@ class ClientSM:
                     pass
                     peer = my_msg[1:]
                     peer = peer.strip()
-                    if self.video_connect_to(peer):
+                    result,ip = self.video_connect_to(peer)
+                    if result:
+                        self.target_ip = ip
                         self.state = S_VIDEO_CHATTING
                         self.out_msg += 'Connect to ' + peer + '. Chat away!\n\n'
                         self.out_msg += '-----------------------------------\n'
                     else:
                         self.out_msg += 'Connection unsuccessful\n'
+
 
                 elif my_msg[0] == 'f':
                     peer = my_msg[1:]
@@ -250,29 +224,62 @@ class ClientSM:
                     self.state = S_CHATTING
 
                 if peer_msg['action'] == 'f_connect':
-                    self.out_msg += peer_msg['from'] + ' joined'
+                    self.out_msg += peer_msg['from'] + ' starts a file transfer!'
+                    self.peer = peer_msg['from']
                     self.state = S_FILETRANSFERING_DOWN
 
                     
+                if peer_msg["action"] == "video_connect":
+                    self.out_msg += peer_msg['from'] + ' starts a voice call'
+                    self.target_ip = peer_msg["target_ip"]
+                    self.peer = peer_msg['from']
+                    self.state = S_VIDEO_CHATTING
 
 
-
-                    # ----------end of your code----#
                     
 #==============================================================================
 # Start chatting, 'bye' for quit
 # This is event handling instate "S_CHATTING"
 #==============================================================================
         elif self.state == S_VIDEO_CHATTING:
-            pass
-            while True:
-                frame = self.vreceive(from_sock, to_sock)
-                self.feed.set_frame(frame)
-                frame = self.feed.get_frame()
-                self.vsend(frame, from_sock, to_sock)
+            self.aclient = Audio_Client(self.target_ip, PORT+1)
+            self.aserver = Audio_Server(PORT+1)
+            self.aserver.start()  
+            time.sleep(1)
+            self.aclient.start()
+            self.state = S_WATING_CALL_ENDING
+        elif self.state == S_WATING_CALL_ENDING:
+            if len(my_msg) > 0:     # my stuff going out                
+                if my_msg == 'end':                    
+                    self.v_disconnect()                    
+                    self.aserver.stop()
+                    time.sleep(1)
+                    self.aclient.stop()
+                    # print("audio client disconnect")
+                    self.state = S_LOGGEDIN
+                    self.peer = ''
+            if len(peer_msg) > 0:
+                peer_msg = pickle.loads(peer_msg)
+                if peer_msg["action"] == "v_disconnect":
+                    self.aserver.stop()
+                    self.aclient.stop()                    
+                    self.out_msg += 'You are disconnected from' + self.peer + '\n'
+                    self.state = S_LOGGEDIN
+                    self.peer = ''
+            if self.state == S_LOGGEDIN:
+                self.out_msg += menu
+
+
+
 
         elif self.state == S_FILETRANSFERING_UP:
             print('initializing file transfer...')
+            print('waiting for response...')
+            msg = pickle.loads(myrecv(self.s))
+            s_file = socket.socket()
+            host = msg['ip']
+            port = msg['port']
+            s_file.connect((host, port))
             # This checks whether the folder has a to_transfer and a downloads folder, if no, create them
             cur_path = os.path.dirname(os.path.abspath(__file__))
             filepath = os.path.join(cur_path, 'downloads')
@@ -282,32 +289,73 @@ class ClientSM:
             filepath = os.path.join(cur_path, 'to_transfer')
             if not os.path.exists(filepath):
                 os.makedirs('to_transfer')
-            print('to transfer, put the file you wish to transfer in the folder \'to_transfer\' under the path which this program is')
-            print('the files you downloaded will be in the folder \'downloads\'')
-            # swi = input('Do you wish to start? (y)es/(n)o')
+            print('to transfer, put the file you wish to transfer in the folder \'to_transfer\' under the path which this program is\nthe files you downloaded will be in the folder \'downloads\'\n')
             lst = os.listdir(filepath)
             for x in range(len(lst)):
                 print('({})'.format(x) + str(lst[x]))
             mark = int(input('which one do you want to transfer?'))
-            file_send(os.path.join(filepath,lst[mark]), self.s)
-
-            time.sleep(5)
-
-            print('all files tranferred')
+            filename = os.path.join(filepath,lst[mark])
+            mysend(self.s, pickle.dumps({"action":'f_confirm_2', 
+                'filename': filename,
+                'filesize': os.path.getsize(filename)}))
+            print('waiting for response...')
+            msg = pickle.loads(myrecv(self.s))
+            if msg['go']:
+                # print('transferring...')
+                file_send(filename, s_file)
+            self.f_disconnect()
+            self.out_msg += menu
             self.state = S_LOGGEDIN
+            print('file transferred')
 
         elif self.state == S_FILETRANSFERING_DOWN:
+            print('initializing file transfer')
             cur_path = os.path.dirname(os.path.abspath(__file__))
             filepath = os.path.join(cur_path, 'downloads')
             if not os.path.exists(filepath):
                 os.makedirs('downloads')
-            while True:
-                res = file_rec(filepath, self.s)
-                if res:
-                    break
-                # time.sleep(5)
-            print('all files received')
-            # self.state = S_LOGGEDIN
+            # print('peer_msg:', peer_msg)
+            # while True:
+            file_server = FileServer()
+            file_server.start()
+            print('connected from', self.peer)
+            # print(file_server.port)
+            mysend(self.s, pickle.dumps({"action":'f_confirm', 
+                'ip': self.ip,
+                'port': file_server.port}))
+            
+            msg = pickle.loads(myrecv(self.s))
+            filename = msg['filename']
+            filesize = msg['filesize']
+            filename_rev = filename[::-1]
+            pos = filename_rev.find('/')
+            filename = filename[-pos:]
+            if filesize > 1024 and filesize < 1024**2:
+                printoutsize = str(round(filesize / 1024, 2)) + 'KB'
+            elif filesize > 1024**2 and filesize < 1024**3:
+                printoutsize = str(round(filesize / 1024**2, 2)) + 'MB'
+            elif filesize > 1024**3 and filesize < 1024**4:
+                printoutsize = str(round(filesize / 1024**3, 2)) + 'GB'
+            print('file name:',filename, 'file size:', printoutsize)
+
+            mark = print(input('--------------------Press any key to continue--------------------\n'))
+
+            mysend(self.s, pickle.dumps({"action":'f_confirm_3', 
+                'go': True}))
+            file_server.recv(filepath, filesize, filename)
+
+
+            # res = file_rec(filepath, self.s)
+            # print('all files received')
+            # time.sleep(3)
+
+            self.out_msg += menu
+            self.state = S_LOGGEDIN
+
+
+
+
+
 
 
 

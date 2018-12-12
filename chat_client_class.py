@@ -18,6 +18,7 @@ class Client:
         self.local_msg = ''
         self.peer_msg = ''
         self.args = args
+        self.ip = self.args.l
 
     def quit(self):
         self.socket.shutdown(socket.SHUT_RDWR)
@@ -30,7 +31,7 @@ class Client:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM )
         svr = SERVER if self.args.d == None else (self.args.d, CHAT_PORT)
         self.socket.connect(svr)
-        self.sm = csm.ClientSM(self.socket)
+        self.sm = csm.ClientSM(self.socket,self.ip)
         reading_thread = threading.Thread(target=self.read_input)
         reading_thread.daemon = True
         reading_thread.start()
@@ -64,7 +65,7 @@ class Client:
         my_msg, peer_msg = self.get_msgs()
         if len(my_msg) > 0:
             self.name = my_msg
-            msg = pickle.dumps({"action":"login", "name":self.name})
+            msg = pickle.dumps({"action":"login", "name":self.name, "ip":self.ip})
             self.send(msg)
             response = pickle.loads(self.recv())
             if response["status"] == 'ok':
