@@ -10,6 +10,8 @@ import os
 import pickle
 import sys
 import time
+from file_server import FileServer
+import socket
 import argparse
 from audio_server import *
 
@@ -23,7 +25,6 @@ class ClientSM:
         self.f_peer = ''
         self.ip = ip
         self.target_ip = ''
-        
 
     def set_state(self, state):
         self.state = state
@@ -54,7 +55,8 @@ class ClientSM:
         return (False)
 
     def file_connect_to(self, peer):
-        msg = pickle.dumps({"action":"f_connect", "target":peer})
+
+        msg = pickle.dumps({'action': 'f_connect', "target":peer})
         mysend(self.s, msg)
         response = pickle.loads(myrecv(self.s))
         if response["status"] == "success":
@@ -88,12 +90,13 @@ class ClientSM:
             self.out_msg += 'User is not online, try again later\n'
         return (False,0)
 
-
     def v_disconnect(self):
         msg = pickle.dumps({"action":"v_disconnect"})
         mysend(self.s, msg)
         self.out_msg += 'You are disconnected from ' + self.peer + '\n'
         self.peer = ''
+
+
 
 
     def disconnect(self):
@@ -103,6 +106,7 @@ class ClientSM:
         self.peer = ''
 
     def proc(self, my_msg, peer_msg):
+        global PORT
         self.out_msg = ''
 #==============================================================================
 # Once logged in, do a few things: get peer listing, connect, search
@@ -163,6 +167,7 @@ class ClientSM:
                     else:
                         self.out_msg += 'Connection unsuccessful\n'
 
+
                 elif my_msg[0] == 'f':
                     peer = my_msg[1:]
                     peer = peer.strip()
@@ -219,28 +224,21 @@ class ClientSM:
                     self.out_msg += peer_msg['from'] + ' joined'
                     self.state = S_FILETRANSFERING_DOWN
 
+                    
                 if peer_msg["action"] == "video_connect":
 
-                    # ----------your code here------#
+                
                     self.out_msg += peer_msg['from'] + ' starts a video call'
                     self.target_ip = peer_msg["target_ip"]
                     self.state = S_VIDEO_CHATTING
 
 
                     
-
-
-
-                    # ----------end of your code----#
-                    
 #==============================================================================
 # Start chatting, 'bye' for quit
 # This is event handling instate "S_CHATTING"
 #==============================================================================
         elif self.state == S_VIDEO_CHATTING:
-            # vclient = Video_Client(IP, PORT, SHOWME, LEVEL)
-            # vserver = Video_Server(PORT)
-
             self.aclient = Audio_Client(self.target_ip, PORT+1)
             self.aserver = Audio_Server(PORT+1)
             
@@ -254,18 +252,10 @@ class ClientSM:
             # self.aserver.set_start()
             self.aclient.start()
             # vclient.start()
+            
+
+
             self.state = S_WATING_CALL_ENDING
-
-
-            # while True:
-                # time.sleep(1)
-                # # if not vserver.isAlive() or not vclient.isAlive():
-                # #     print("Video connection lost...")
-                # #     sys.exit(0)
-                # if not aserver.isAlive() or not aclient.isAlive():
-                #     print("Audio connection lost...")
-                #     sys.exit(0)
-
 
         elif self.state == S_WATING_CALL_ENDING:
             if len(my_msg) > 0:     # my stuff going out
@@ -273,11 +263,13 @@ class ClientSM:
                 if my_msg == 'end':
                     
                     self.v_disconnect()
-                    
+                    self.aserver.stop()
                     self.aclient.stop()
+                    
                     print("audio client disconnect")
                     time.sleep(1)
-                    self.aserver.stop()
+                    
+                    
                     # self.aserver.set_start()
                     # print("audio server disconnect")
 
@@ -286,15 +278,113 @@ class ClientSM:
             if len(peer_msg) > 0:
                 peer_msg = pickle.loads(peer_msg)
                 if peer_msg["action"] == "v_disconnect":
+                    self.aserver.stop()
                     self.aclient.stop()
+                    
                     time.sleep(1)
-                    # self.aserver.stop()
+                    
+                    
+                    PORT += 1
 
                     self.state = S_LOGGEDIN
                     self.peer = ''
 
             if self.state == S_LOGGEDIN:
                 self.out_msg += menu
+
+
+
+
+        elif self.state == S_FILETRANSFERING_UP:
+            print('initializing file transfer...')
+            print('waiting for response...')
+            msg = pickle.loads(myrecv(self.s))
+            s_file = socket.socket()
+            host = msg['ip']
+            port = msg['port']
+            s_file.connect((host, port))
+            # This checks whether the folder has a to_transfer and a downloads folder, if no, create them
+            cur_path = os.path.dirname(os.path.abspath(__file__))
+            filepath = os.path.join(cur_path, 'downloads')
+            if not os.path.exists(filepath):
+                os.makedirs('downloads')
+            cur_path = os.path.dirname(os.path.abspath(__file__))
+            filepath = os.path.join(cur_path, 'to_transfer')
+            if not os.path.exists(filepath):
+                os.makedirs('to_transfer')
+            print('to transfer, put the file you wish to transfer in the folder \'to_transfer\' \n under the path which this program is')
+            print('the files you downloaded will be in the folder \'downloads\'')
+            # swi = input('Do you wish to start? (y)es/(n)o')
+            lst = os.listdir(filepath)
+            for x in range(len(lst)):
+                print('({})'.format(x) + str(lst[x]))
+            mark = int(input('which one do you want to transfer?'))
+            print('\n')
+            filename = os.path.join(filepath,lst[mark])
+            mysend(self.s, pickle.dumps({"action":'f_confirm_2', 
+                'filename': filename,
+                'filesize': os.path.getsize(filename)}))
+            msg = pickle.loads(myrecv(self.s))
+            if msg['go']:
+                print('transferring...')
+                file_send(filename, s_file)
+            # time.sleep(3)
+            self.out_msg += menu
+            self.state = S_LOGGEDIN
+
+
+            
+
+            print('file transferred')
+            self.state = S_LOGGEDIN
+
+        elif self.state == S_FILETRANSFERING_DOWN:
+            print('initializing file transfer')
+            cur_path = os.path.dirname(os.path.abspath(__file__))
+            filepath = os.path.join(cur_path, 'downloads')
+            if not os.path.exists(filepath):
+                os.makedirs('downloads')
+            # print('peer_msg:', peer_msg)
+            # while True:
+            file_server = FileServer()
+            file_server.start()
+            # print(file_server.port)
+            mysend(self.s, pickle.dumps({"action":'f_confirm', 
+                'ip': self.ip,
+                'port': file_server.port}))
+            
+            msg = pickle.loads(myrecv(self.s))
+            filename = msg['filename']
+            filesize = msg['filesize']
+            filename_rev = filename[::-1]
+            pos = filename_rev.find('/')
+            filename = filename[-pos:]
+            if filesize > 1024 and filesize < 1024**2:
+                printoutsize = str(round(filesize / 1024, 2)) + 'KB'
+            elif filesize > 1024**2 and filesize < 1024**3:
+                printoutsize = str(round(filesize / 1024**2, 2)) + 'MB'
+            elif filesize > 1024**3 and filesize < 1024**4:
+                printoutsize = str(round(filesize / 1024**3, 2)) + 'GB'
+            print('file name:',filename, 'file size:', printoutsize)
+
+            mark = input('--------------------Press any key to continue--------------------')
+            if mark:
+                mysend(self.s, pickle.dumps({"action":'f_confirm_3', 
+                'go': True}))
+                file_server.recv(filepath, filesize, filename)
+
+
+            # res = file_rec(filepath, self.s)
+            # print('all files received')
+            # time.sleep(3)
+
+            self.out_msg += menu
+            self.state = S_LOGGEDIN
+
+
+
+
+
 
 
 

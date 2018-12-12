@@ -18,7 +18,7 @@ class Client:
         self.local_msg = ''
         self.peer_msg = ''
         self.args = args
-        self.ip = self.args.TEST
+        self.ip = self.args.l
 
     def quit(self):
         self.socket.shutdown(socket.SHUT_RDWR)

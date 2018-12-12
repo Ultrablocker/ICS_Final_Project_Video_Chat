@@ -11,16 +11,17 @@ LEVEL = 1
 
 CHAT_IP = ''#socket.gethostbyname(socket.gethostname())
 
-CHAT_PORT = 1112
+CHAT_PORT = 11120
 SERVER = (CHAT_IP, CHAT_PORT)
 
 VIDEO_PORT = 10087
+
 menu = "\n++++ Choose one of the following commands\n \
         time: calendar time in the system\n \
         who: to find out who else are there\n \
         c _peer_: to connect to the _peer_ and chat\n \
-        v _peer_: to connect to the _peer_ and initiate a video chat \n \
-        f _peer_: to initiate file transfering\n\
+        v _peer_: to connect to the _peer_ and initiate a voice call \n \
+        f _peer_: to initiate file transfering\n \
         ? _term_: to search your chat logs where _term_ appears\n \
         p _#_: to get number <#> sonnet\n \
         q: to leave the chat system\n\n"
@@ -52,6 +53,8 @@ def print_state(state):
         print('Video chatting')
     elif state == S_FILETRANSFERING:
         print('Transfering files')
+    elif state == S_WATING_CALL_ENDING:
+        print('video chatting')
     else:
         print('Error: wrong state')
 
@@ -60,12 +63,13 @@ def mysend(s, msg):
     msg = ('0' * SIZE_SPEC + str(len(msg)))[-SIZE_SPEC:].encode() + msg
     # msg = msg.encode()
     total_sent = 0
-    while total_sent < len(msg) :
+    while total_sent < len(msg):
         sent = s.send(msg[total_sent:])
         if sent==0:
             print('server disconnected')
             break
         total_sent += sent
+    # print(len(msg))
 
 def myrecv(s):
     #receive size first
@@ -78,14 +82,17 @@ def myrecv(s):
         size += text
     size = int(size)
     #now receive message
+    # print(size)
     msg = b''
     while len(msg) < size:
         text = s.recv(size-len(msg))
+        msg += text
         if text == b'':
             print('disconnected')
             break
         msg += text
     #print ('received '+message)
+    # print(len(msg))
     return (msg)
 
 def text_proc(text, user):

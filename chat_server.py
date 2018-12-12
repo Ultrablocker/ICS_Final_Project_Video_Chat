@@ -11,7 +11,7 @@ import sys
 import string
 import indexer
 import json
-import pickle as pkl
+import pickle
 from chat_utils import *
 import chat_group as grp
 # from Feed import Feed
@@ -50,7 +50,7 @@ class Server:
         # print(sock)
         # read the msg that should have login code plus username
         try:
-            msg = pkl.loads(myrecv(sock))
+            msg = pickle.loads(myrecv(sock))
             print(msg)
             if len(msg) > 0:
 
@@ -70,17 +70,17 @@ class Server:
                         # load chat history of that user
                         if name not in self.indices.keys():
                             try:
-                                self.indices[name] = pkl.load(
+                                self.indices[name] = pickle.load(
                                     open(name + '.idx', 'rb'))
                             except IOError:  # chat index does not exist, then create one
                                 self.indices[name] = indexer.Index(name)
 
                         print(name + ' logged in')
                         self.group.join(name)
-                        mysend(sock, pkl.dumps(
+                        mysend(sock, pickle.dumps(
                             {"action": "login", "status": "ok"}))
                     else:  # a client under this name has already logged in
-                        mysend(sock, pkl.dumps(
+                        mysend(sock, pickle.dumps(
                             {"action": "login", "status": "duplicate"}))
                         print(name + ' duplicate login attempt')
                 else:
@@ -93,7 +93,7 @@ class Server:
     def logout(self, sock):
         # remove sock from all lists
         name = self.logged_sock2name[sock]
-        pkl.dump(self.indices[name], open(name + '.idx', 'wb'))
+        pickle.dump(self.indices[name], open(name + '.idx', 'wb'))
         del self.indices[name]
         del self.logged_name2sock[name]
         del self.logged_sock2name[sock]
@@ -108,82 +108,50 @@ class Server:
 # ==============================================================================
     def handle_msg(self, from_sock):
         # read msg code
-        msg = myrecv(from_sock)
-
-        print(msg)
+        try:
+            msg = myrecv(from_sock)
+        except UnicodeDecodeError:
+            msg = from_sock.recv(1024)
 
         if len(msg) > 0:
             # ==============================================================================
             # handle connect request this is implemented for you
             # ==============================================================================
-            msg = pkl.loads(msg)
+
+
+            msg = pickle.loads(msg)
+            # print(msg)
             if msg["action"] == "connect":
                 to_name = msg["target"]
                 from_name = self.logged_sock2name[from_sock]
-                self.client_call_avail[from_name] = "busy"
                 if to_name == from_name:
-                    msg = pkl.dumps({"action": "connect", "status": "self"})
+                    msg = pickle.dumps({"action": "connect", "status": "self"})
                 # connect to the peer
                 elif self.group.is_member(to_name):
                     to_sock = self.logged_name2sock[to_name]
                     self.group.connect(from_name, to_name)
                     the_guys = self.group.list_me(from_name)
-                    msg = pkl.dumps(
+                    msg = pickle.dumps(
                         {"action": "connect", "status": "success"})
                     for g in the_guys[1:]:
                         to_sock = self.logged_name2sock[g]
-                        self.client_call_avail[g] = "busy"
-                        mysend(to_sock, pkl.dumps(
+                        mysend(to_sock, pickle.dumps(
                             {"action": "connect", "status": "request", "from": from_name}))
                 else:
-                    msg = pkl.dumps(
+                    msg = pickle.dumps(
                         {"action": "connect", "status": "no-user"})
                 mysend(from_sock, msg)
-
 # ==============================================================================
-# handle file transger request 
+# video connect
 # ==============================================================================
-
-
-            elif msg['action'] == 'f_connect':
-                to_name = msg["target"]
-                from_name = self.logged_sock2name[from_sock]
-                if to_name == from_name:
-                    msg = pkl.dumps({"action": "f_connect", "status": "self"})
-                # connect to the peer
-                elif self.group.is_member(to_name):
-                    to_sock = self.logged_name2sock[to_name]
-                    self.group.connect(from_name, to_name)
-                    the_guys = self.group.list_me(from_name)
-                    msg = pkl.dumps(
-                        {"action": "f_connect", "status": "success"})
-                    for g in the_guys[1:]:
-                        to_sock = self.logged_name2sock[g]
-                        mysend(to_sock, pkl.dumps(
-                            {"action": "f_connect", "status": "request", "from": from_name}))
-
-                else:
-                    msg = pkl.dumps(
-                        {"action": "f_connect", "status": "no-user"})
-                mysend(from_sock, msg)
-
-                
-                
-
-                pass
-
-# ==============================================================================
-# handle video call  request 
-# ==============================================================================
-
 
             elif msg['action'] == 'video_connect':
                 to_name = msg["target"]
                 from_name = self.logged_sock2name[from_sock]
                 if to_name == from_name:
-                    msg = pkl.dumps({"action": "video_connect", "status": "self"})
+                    msg = pickle.dumps({"action": "video_connect", "status": "self"})
                 elif self.client_call_avail[to_name] == "busy":
-                    msg = pkl.dumps({"action": "video_connect", "status": "busy"})
+                    msg = pickle.dumps({"action": "video_connect", "status": "busy"})
                 # connect to the peer
                 elif self.group.is_member(to_name):
                     self.client_call_avail[from_name] = "busy"
@@ -193,15 +161,15 @@ class Server:
                     to_sock = self.logged_name2sock[to_name]
                     self.group.connect(from_name, to_name)
                     #the_guys = self.group.list_me(from_name)
-                    msg = pkl.dumps(
+                    msg = pickle.dumps(
                         {"action": "video_connect", "status": "success","target_ip":to_ip})
                     # for g in the_guys[1:]:
                     #     to_sock = self.logged_name2sock[g]
-                    mysend(to_sock, pkl.dumps(
+                    mysend(to_sock, pickle.dumps(
                         {"action": "video_connect", "status": "request", "from": from_name,"target_ip":from_ip}))
 
                 else:
-                    msg = pkl.dumps(
+                    msg = pickle.dumps(
                         {"action": "f_connect", "status": "no-user"})
                 mysend(from_sock, msg)
 
@@ -235,7 +203,7 @@ class Server:
 
                     # IMPLEMENTATION
                     # ---- start your code ---- #
-                    mysend(to_sock, pkl.dumps(msg))
+                    mysend(to_sock, pickle.dumps(msg))
 
                     # ---- end of your code --- #
 
@@ -243,6 +211,66 @@ class Server:
 
 
 
+
+
+
+
+
+            elif msg['action'] == 'f_connect':
+                to_name = msg["target"]
+                from_name = self.logged_sock2name[from_sock]
+                if to_name == from_name:
+                    msg = pickle.dumps({"action": "f_connect", "status": "self"})
+                # connect to the peer
+                elif self.group.is_member(to_name):
+                    to_sock = self.logged_name2sock[to_name]
+                    self.group.connect(from_name, to_name)
+                    the_guys = self.group.list_me(from_name)
+                    msg = pickle.dumps(
+                        {"action": "f_connect", "status": "success"})
+                    for g in the_guys[1:]:
+                        to_sock = self.logged_name2sock[g]
+                        mysend(to_sock, pickle.dumps(
+                            {"action": "f_connect", "status": "request", "from": from_name}))
+
+                else:
+                    msg = pickle.dumps(
+                        {"action": "f_connect", "status": "no-user"})
+                mysend(from_sock, msg)
+
+
+
+            elif msg['action'] == 'f_confirm':
+                from_name = self.logged_sock2name[from_sock]
+                print('f_confirm received')
+
+                the_guys = self.group.list_me(from_name)[1:]
+                for g in the_guys:
+                    to_sock = self.logged_name2sock[g]
+                    mysend(to_sock, pickle.dumps(msg))
+
+            elif msg['action'] == 'f_confirm_2':
+                from_name = self.logged_sock2name[from_sock]
+                print('f_confirm_2 received')
+
+                the_guys = self.group.list_me(from_name)[1:]
+                for g in the_guys:
+                    to_sock = self.logged_name2sock[g]
+                    mysend(to_sock, pickle.dumps(msg))
+            elif msg['action'] == 'f_confirm_3':
+                from_name = self.logged_sock2name[from_sock]
+                print('f_confirm_3 received')
+
+                the_guys = self.group.list_me(from_name)[1:]
+                for g in the_guys:
+                    to_sock = self.logged_name2sock[g]
+                    mysend(to_sock, pickle.dumps(msg))
+
+
+                
+                
+
+                pass
 
 
 
@@ -258,12 +286,12 @@ class Server:
                 the_guys.remove(from_name)
                 # g = the_guys.pop()
                 # to_sock = self.logged_name2sock[g]
-                # mysend(to_sock, pkl.dumps(
+                # mysend(to_sock, pickle.dumps(
                 #         {"action": "disconnect", 'from': from_name, 'is_one': False}))
                 if len(the_guys) == 1:  # only one left
                     g = the_guys.pop()
                     to_sock = self.logged_name2sock[g]
-                    mysend(to_sock, pkl.dumps(
+                    mysend(to_sock, pickle.dumps(
                         {"action": "disconnect", "msg": "everyone left, you are alone", 'from': from_name, 'is_one': True}))
 
 # ==============================================================================
@@ -281,9 +309,8 @@ class Server:
                 g = the_guys.pop()
                 self.client_call_avail[g] = "available"
                 to_sock = self.logged_name2sock[g]
-                mysend(to_sock,pkl.dumps({"action":"v_disconnect"}))
+                mysend(to_sock,pickle.dumps({"action":"v_disconnect"}))
                 print("sent")
-
 # ==============================================================================
 #                 listing available peers: IMPLEMENT THIS
 # ==============================================================================
@@ -295,7 +322,7 @@ class Server:
                 msg = self.group.list_all(from_name)
 
                 # ---- end of your code --- #
-                mysend(from_sock, pkl.dumps(
+                mysend(from_sock, pickle.dumps(
                     {"action": "list", "results": msg}))
 # ==============================================================================
 #             retrieve a sonnet : IMPLEMENT THIS
@@ -309,14 +336,14 @@ class Server:
 
                 # ---- end of your code --- #
 
-                mysend(from_sock, pkl.dumps(
+                mysend(from_sock, pickle.dumps(
                     {"action": "poem", "results": poem}))
 # ==============================================================================
 #                 time
 # ==============================================================================
             elif msg["action"] == "time":
                 ctime = time.strftime('%d.%m.%y,%H:%M', time.localtime())
-                mysend(from_sock, pkl.dumps(
+                mysend(from_sock, pickle.dumps(
                     {"action": "time", "results": ctime}))
 # ==============================================================================
 #                 search: : IMPLEMENT THIS
@@ -340,8 +367,9 @@ class Server:
                 print('server side search: ' + search_rslt)
 
                 # ---- end of your code --- #
-                mysend(from_sock, pkl.dumps(
+                mysend(from_sock, pickle.dumps(
                     {"action": "search", "results": search_rslt}))
+
 
 # ==============================================================================
 #                 the "from" guy really, really has had enough
@@ -360,10 +388,13 @@ class Server:
         print('starting server...')
         while(1):
             read, write, error = select.select(self.all_sockets, [], [])
+
             print('checking logged clients..')
             for logc in list(self.logged_name2sock.values()):
                 if logc in read:
                     self.handle_msg(logc)
+                    # time.sleep(2)
+            # print('selected')
             print('checking new clients..')
             for newc in self.new_clients[:]:
                 if newc in read:
