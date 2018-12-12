@@ -4,64 +4,53 @@ import json
 from chat_utils import *
 import pickle
 
-def file_send_init(filename, s):
-    # size = os.path.getsize(filename)
-    # msg = json.dumps({'filename': filename, "from": s, "size": size})
-    # msg = msg.encode()
-    # sent = mysend(s, msg)
-    # text = myrecv(s)
-    # if text == 'y':
-    file_send(filename, s)
-    # else:
-    #     print('request denied')
 
 def file_send(filename, s):
     f = open(filename,'rb')
+    size = os.path.getsize(filename)
+    filename_rev = filename[::-1]
+    pos = filename_rev.find('/')
+    filename = filename[-pos:]
+    print(filename)
     l = f.read(1024)
-    print(l)
-    while l is not None:
-        sent = s.send(l)
-        print('sending file...')
-        # print('Sent ',repr(l))
-        l = f.read(1024)
+    com_size = 0
+    while (l):
+       s.send(l)
+       # print('Sent ',repr(l))
+       com_size += 1024
+       percent= com_size/size
+       if percent < 1 and com_size % 102400 == 0:
+           print ("\033[A                             \033[A")
+           print("Transferring...{percent:.2%}\r".format(percent = com_size/size))
+       l = f.read(1024)
     f.close()
 
-    
-def file_rec_init(path, s):
-    # text = myrecv(s)
-    # print(text)
-    # res = input('Do you wish to download the file? (y)es/(n)o')
-    # return res
-    # if res == 'y':
-    #     msg = 'y'
-    #     msg = msg.encode()
-    #     s.send(msg)
-    #     file_rec(s, text, path)
-    # else:
-    #     msg = 'n'
-    #     msg = msg.encode()
-    #     s.send(msg)
-    #     print('transfer denied')
-    file_rec(path, s)
 
-def file_rec(path, s):
-    # size = text['size']
-    cur_size = 0
-    with open(os.path.join(path, 'text.txt'), 'wb') as f:
-        print('file opened')
+def file_rec(path, s, size, name):
+
+
+    filename = os.path.join(path, name)
+    # print(filename)
+    com_size = 0
+    with open(filename, 'wb') as f:
         print('receiving data...')
         while True:
-            # print('{:.1%}'.format(cur_size/size))
             data = s.recv(1024)
-            cur_size += 1024
-            # print('data=%s', (data))
+            # print(data)
+            com_size += 1024
+            percent= com_size/size
+            if percent < 1 and com_size % 102400 == 0:
+                print ("\033[A                             \033[A")
+                print("Downloading...{percent:.2%}".format(percent = com_size/size))
+
+            
+            if not data:
+                break
+        # write data to a file
             f.write(data)
             
-            if data is None:
-                break
             # write data to a file
             
-    f.close()
     # msg = 'transfer complete'
     # msg = msg.encode()
     # s.send(msg)
@@ -71,19 +60,18 @@ def file_rec(path, s):
     pass
 
 def main():
-    print(os.path.getsize('/Users/Robert1/Downloads/v_2009_holz_global_iew.pdf'))
-    print(type(os.path.getsize('/Users/Robert1/Downloads/v_2009_holz_global_iew.pdf')))
-    cur_size = 10
-    size = 50
-    print('{:.1%}'.format(cur_size/size))
-    with open('/Users/Robert1/Downloads/v_2009_holz_global_iew.pdf', 'rb') as f:
-        l = f.read()
-        print(l)
-    msg = {'abc':l}
-    msg = pickle.dumps(msg)
-    msg = pickle.loads(msg)
-    print(type(msg))
-
+    
+    
+    # with open('/Users/Robert1/Downloads/v_2009_holz_global_iew.pdf', 'rb') as f:
+    #     l = f.read(1024)
+    #     print(l)
+    # msg = pickle.dumps({'action': 'f_exchange', 'data': l, 'size': size, 'filename': 'filename'})
+    # print(len(msg))
+    # msg = {'abc':l}
+    # msg = pickle.dumps(msg)
+    # msg = pickle.loads(msg)
+    # print(type(msg))
+    print(type(socket.gethostbyname(socket.gethostname())))
 
 
 if __name__ == '__main__':
